@@ -19,6 +19,8 @@ interface Transaction {
   points_redeemed: number;
   discount_applied: number;
   transaction_date: string;
+  customer_id: string;
+  vehicle_id: string;
   customers: {
     name: string | null;
     mobile: string;
@@ -66,6 +68,19 @@ export const AdminTransactionsView = () => {
       setLoading(true);
       console.log('Fetching transactions...');
       
+      // First, let's check if we have any transactions at all
+      const { data: allTransactions, error: countError } = await supabase
+        .from('transactions')
+        .select('id, customer_id, vehicle_id')
+        .limit(10);
+
+      console.log('All transactions count check:', allTransactions);
+      
+      if (countError) {
+        console.error('Error counting transactions:', countError);
+      }
+
+      // Now fetch with joins
       const { data, error } = await supabase
         .from('transactions')
         .select(`
@@ -77,18 +92,39 @@ export const AdminTransactionsView = () => {
           points_redeemed,
           discount_applied,
           transaction_date,
-          customers!transactions_customer_id_fkey(name, mobile),
-          vehicles!transactions_vehicle_id_fkey(vehicle_number, vehicle_type)
+          customer_id,
+          vehicle_id,
+          customers (
+            name,
+            mobile
+          ),
+          vehicles (
+            vehicle_number,
+            vehicle_type
+          )
         `)
-        .order('transaction_date', { ascending: false })
-        .limit(500);
+        .order('transaction_date', { ascending: false });
 
       if (error) {
-        console.error('Error fetching transactions:', error);
+        console.error('Error fetching transactions with joins:', error);
         throw error;
       }
 
-      console.log('Fetched transactions:', data);
+      console.log('Fetched transactions with joins:', data);
+      console.log('Number of transactions:', data?.length || 0);
+      
+      // Let's also check customers and vehicles separately
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('*');
+      
+      const { data: vehicles } = await supabase
+        .from('vehicles')
+        .select('*');
+      
+      console.log('Available customers:', customers);
+      console.log('Available vehicles:', vehicles);
+
       setTransactions(data || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -126,6 +162,15 @@ export const AdminTransactionsView = () => {
 
   return (
     <div className="space-y-6">
+      {/* Debug Info */}
+      <Card className="bg-yellow-50 border-yellow-200">
+        <CardContent className="pt-4">
+          <p className="text-sm text-yellow-800">
+            Debug: Found {totalTransactions} transactions. Check console for detailed logs.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
