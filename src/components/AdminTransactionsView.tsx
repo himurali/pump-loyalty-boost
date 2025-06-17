@@ -22,11 +22,11 @@ interface Transaction {
   customers: {
     name: string | null;
     mobile: string;
-  };
+  } | null;
   vehicles: {
     vehicle_number: string;
     vehicle_type: string;
-  };
+  } | null;
 }
 
 export const AdminTransactionsView = () => {
@@ -38,11 +38,33 @@ export const AdminTransactionsView = () => {
 
   useEffect(() => {
     fetchTransactions();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transactions'
+        },
+        () => {
+          console.log('Transaction change detected, refreshing data...');
+          fetchTransactions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
+      console.log('Fetching transactions...');
       
       const { data, error } = await supabase
         .from('transactions')
@@ -55,14 +77,18 @@ export const AdminTransactionsView = () => {
           points_redeemed,
           discount_applied,
           transaction_date,
-          customers!inner(name, mobile),
-          vehicles!inner(vehicle_number, vehicle_type)
+          customers!transactions_customer_id_fkey(name, mobile),
+          vehicles!transactions_vehicle_id_fkey(vehicle_number, vehicle_type)
         `)
         .order('transaction_date', { ascending: false })
-        .limit(500); // Limit to recent 500 transactions
+        .limit(500);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
+      }
 
+      console.log('Fetched transactions:', data);
       setTransactions(data || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -77,10 +103,13 @@ export const AdminTransactionsView = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
+    const customer = transaction.customers;
+    const vehicle = transaction.vehicles;
+    
     const matchesSearch = 
-      transaction.customers.mobile.includes(searchTerm) ||
-      transaction.customers.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.vehicles.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase());
+      customer?.mobile?.includes(searchTerm) ||
+      customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vehicle?.vehicle_number?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFuelType = fuelTypeFilter === 'all' || transaction.fuel_type === fuelTypeFilter;
     
@@ -89,8 +118,8 @@ export const AdminTransactionsView = () => {
 
   // Calculate summary statistics
   const totalTransactions = transactions.length;
-  const totalRevenue = transactions.reduce((sum, t) => sum + t.amount_paid, 0);
-  const totalLiters = transactions.reduce((sum, t) => sum + t.liters, 0);
+  const totalRevenue = transactions.reduce((sum, t) => sum + Number(t.amount_paid), 0);
+  const totalLiters = transactions.reduce((sum, t) => sum + Number(t.liters), 0);
   const totalPointsEarned = transactions.reduce((sum, t) => sum + t.points_earned, 0);
 
   const formatCurrency = (amount: number) => `₹${amount.toFixed(2)}`;
@@ -224,18 +253,18 @@ export const AdminTransactionsView = () => {
                     <TableCell>
                       <div>
                         <div className="font-medium">
-                          {transaction.customers.name || 'N/A'}
+                          {transaction.customers?.name || 'N/A'}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {transaction.customers.mobile}
+                          {transaction.customers?.mobile || 'N/A'}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{transaction.vehicles.vehicle_number}</div>
+                        <div className="font-medium">{transaction.vehicles?.vehicle_number || 'N/A'}</div>
                         <div className="text-sm text-muted-foreground capitalize">
-                          {transaction.vehicles.vehicle_type.replace('_', ' ')}
+                          {transaction.vehicles?.vehicle_type?.replace('_', ' ') || 'N/A'}
                         </div>
                       </div>
                     </TableCell>
@@ -243,7 +272,7 @@ export const AdminTransactionsView = () => {
                       <div>
                         <div className="flex items-center gap-1">
                           <Fuel className="h-3 w-3" />
-                          <span className="font-medium">{transaction.liters}L</span>
+                          <span className="font-medium">{Number(transaction.liters).toFixed(2)}L</span>
                         </div>
                         <Badge variant="outline" className="text-xs mt-1">
                           {transaction.fuel_type.toUpperCase()}
@@ -251,7 +280,7 @@ export const AdminTransactionsView = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="font-medium">{formatCurrency(transaction.amount_paid)}</div>
+                      <div className="font-medium">{formatCurrency(Number(transaction.amount_paid))}</div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="space-y-1">
@@ -268,9 +297,9 @@ export const AdminTransactionsView = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {transaction.discount_applied > 0 ? (
+                      {Number(transaction.discount_applied) > 0 ? (
                         <Badge variant="default" className="text-xs">
-                          -{formatCurrency(transaction.discount_applied)}
+                          -{formatCurrency(Number(transaction.discount_applied))}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
