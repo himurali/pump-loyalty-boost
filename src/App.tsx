@@ -15,6 +15,10 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const { user, loading } = useAuth();
 
+  console.log('Auth state:', { user, loading });
+  console.log('User metadata:', user?.user_metadata);
+  console.log('User role:', user?.user_metadata?.role);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -26,13 +30,18 @@ const AppContent = () => {
     );
   }
 
+  if (!user) {
+    return <AuthForm />;
+  }
+
   const isAdmin = user?.user_metadata?.role === 'admin';
+  console.log('Is admin?', isAdmin);
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={
-          user ? (isAdmin ? <AdminDashboard /> : <Dashboard />) : <AuthForm />
+          isAdmin ? <AdminDashboard /> : <Dashboard />
         } />
         <Route path="*" element={<NotFound />} />
       </Routes>
