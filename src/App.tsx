@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthForm } from "@/components/AuthForm";
 import { Dashboard } from "@/components/Dashboard";
+import { AdminDashboard } from "@/components/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,10 +26,14 @@ const AppContent = () => {
     );
   }
 
+  const isAdmin = user?.user_metadata?.role === 'admin';
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={user ? <Dashboard /> : <AuthForm />} />
+        <Route path="/" element={
+          user ? (isAdmin ? <AdminDashboard /> : <Dashboard />) : <AuthForm />
+        } />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

@@ -7,173 +7,201 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Fuel } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Fuel, Shield } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export const AuthForm = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [role, setRole] = useState<'fuel_staff' | 'admin'>('fuel_staff');
+  const [error, setError] = useState('');
   const { signIn, signUp } = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  const [signInData, setSignInData] = useState({
-    email: '',
-    password: ''
-  });
-
-  const [signUpData, setSignUpData] = useState({
-    email: '',
-    password: '',
-    name: '',
-    mobile: '',
-    pumpId: '',
-    role: 'fuel_staff' as 'fuel_staff' | 'admin'
-  });
+  const { toast } = useToast();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
 
-    const { error } = await signIn(signInData.email, signInData.password);
-    
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Signed in successfully!');
+    try {
+      const { error } = await signIn(email, password);
+      if (error) {
+        setError(error.message);
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
 
-    const { error } = await signUp(signUpData.email, signUpData.password, {
-      name: signUpData.name,
-      mobile: signUpData.mobile,
-      pump_id: signUpData.pumpId,
-      role: signUpData.role
-    });
-    
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Account created successfully! Please check your email to verify your account.');
+    try {
+      const { error } = await signUp(email, password, {
+        name,
+        mobile,
+        role
+      });
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        toast({
+          title: "Registration successful!",
+          description: "Please check your email to confirm your account.",
+        });
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-            <Fuel className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Fuel className="w-8 h-8 text-blue-600" />
+            <h1 className="text-2xl font-bold">Fuel Station System</h1>
           </div>
-          <CardTitle className="text-2xl">Fuel Station System</CardTitle>
           <CardDescription>
-            Sign in to manage customer transactions and loyalty points
+            Sign in to manage fuel transactions and customer loyalty
           </CardDescription>
         </CardHeader>
+        
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs defaultValue="signin" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
-            
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="signin-email">Email</Label>
                   <Input
-                    id="email"
+                    id="signin-email"
                     type="email"
-                    value={signInData.email}
-                    onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
+                    placeholder="Enter your email"
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="signin-password">Password</Label>
                   <Input
-                    id="password"
+                    id="signin-password"
                     type="password"
-                    value={signInData.password}
-                    onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
+                    placeholder="Enter your password"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Signing in...' : 'Sign In'}
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Sign In
                 </Button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Full Name</Label>
                   <Input
                     id="signup-name"
-                    value={signUpData.name}
-                    onChange={(e) => setSignUpData({ ...signUpData, name: e.target.value })}
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     required
+                    placeholder="Enter your full name"
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="signup-mobile">Mobile Number</Label>
                   <Input
                     id="signup-mobile"
-                    value={signUpData.mobile}
-                    onChange={(e) => setSignUpData({ ...signUpData, mobile: e.target.value })}
+                    type="tel"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
                     required
+                    placeholder="Enter your mobile number"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-pump">Pump ID</Label>
-                  <Input
-                    id="signup-pump"
-                    value={signUpData.pumpId}
-                    onChange={(e) => setSignUpData({ ...signUpData, pumpId: e.target.value })}
-                    placeholder="e.g., PUMP001"
-                    required
-                  />
-                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="signup-role">Role</Label>
-                  <Select value={signUpData.role} onValueChange={(value: 'fuel_staff' | 'admin') => setSignUpData({ ...signUpData, role: value })}>
+                  <Select value={role} onValueChange={(value: 'fuel_staff' | 'admin') => setRole(value)}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fuel_staff">Fuel Staff</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="fuel_staff">
+                        <div className="flex items-center gap-2">
+                          <Fuel className="w-4 h-4" />
+                          Fuel Staff
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4" />
+                          Administrator
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
-                    value={signUpData.email}
-                    onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
+                    placeholder="Enter your email"
                   />
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="signup-password"
                     type="password"
-                    value={signUpData.password}
-                    onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
+                    placeholder="Create a password"
+                    minLength={6}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Creating account...' : 'Create Account'}
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Sign Up
                 </Button>
               </form>
             </TabsContent>
